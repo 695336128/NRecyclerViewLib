@@ -218,6 +218,9 @@ public class NRecyclerView extends BaseLayout{
                     //TODO 已经滑动到最底端
                     if(!isLoadingMore && isPullLoadEnable && !isRefreshing){
                         View lastView = contentView.getChildAt(contentView.getChildCount()-1);
+                        if (lastView == null){
+                            return;
+                        }
                         Rect rect = getLocalRectPosition(lastView);
                         if(lastView.getHeight() == rect.bottom){
                             pullMoreEvent();

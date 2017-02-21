@@ -31,61 +31,48 @@ import com.hr.nipuream.NRecyclerView.view.util.Logger;
 import java.math.BigDecimal;
 
 /**
- * 描述：最外层的布局，支持嵌套滚动
- * 职责：刷新、加载
- * 作者：Nipuream
- * 时间: 2016-08-01 15:16
+ * 描述：最外层的布局，支持嵌套滚动 职责：刷新、加载 作者：Nipuream 时间: 2016-08-01 15:16
  * 邮箱：571829491@qq.com
  * <p>
  * ===================================================================================================================
- * linear layout, where HeaderView and FooterView are on the screen
- * outside, if the order is headerView, contentView, FooterView,
- * then, it's a pity that you can't always see the FooterView, because the ContentView is occupied.
- * location is match_parent, the solution is to add the FooterView, and then again
- * add ContentView, and finally in the onLayout () method to set up where they are located
- * area location
+ * linear layout, where HeaderView and FooterView are on the screen outside, if
+ * the order is headerView, contentView, FooterView, then, it's a pity that you
+ * can't always see the FooterView, because the ContentView is occupied.
+ * location is match_parent, the solution is to add the FooterView, and then
+ * again add ContentView, and finally in the onLayout () method to set up where
+ * they are located area location
  *
  * @See onLayout
- * <p>
- * |---------------------------|<-----------
- * |                           |   HeaderView
- * |---------------------------|<-----------
- * |                           |
- * |                           |
- * |                           |
- * |                           |
- * |                           |
- * |                           |   Screen(ContentView)
- * |                           |
- * |                           |
- * |                           |
- * |                           |
- * |                           |
- * |                           |
- * |-------------------------- |<------------
- * |                           |    FooterView
- * |---------------------------|<-------------
- * <p>
- * =========================================================================================================================
+ *      <p>
+ *      |---------------------------|<----------- | | HeaderView
+ *      |---------------------------|<----------- | | | | | | | | | | | |
+ *      Screen(ContentView) | | | | | | | | | | | | |--------------------------
+ *      |<------------ | | FooterView
+ *      |---------------------------|<-------------
+ *      <p>
+ *      =========================================================================================================================
  */
-public abstract class BaseLayout extends LinearLayout
-        implements NestedScrollingParent {
+public abstract class BaseLayout extends LinearLayout implements NestedScrollingParent {
 
     private int mTouchSlop;
+
     protected boolean mIsBeingDragged = false;
+
     private float mLastMotionY;
+
     protected float mInitialMotionY;
 
     /**
      * push、pull Damping coefficient.
      */
     private float resistance = 0.6f;
+
     /**
      * OverScroll Effect damping coefficient
      */
     private float overResistance = 0.4f;
-    private Scroller mScroller;
 
+    private Scroller mScroller;
 
     /**
      * push、pull backoff time
@@ -93,25 +80,33 @@ public abstract class BaseLayout extends LinearLayout
     private int duration = 200;
 
     protected boolean isRefreshing = false;
+
     protected boolean isLoadingMore = false;
+
     protected ViewGroup headerView;
+
     protected ViewGroup footerView;
+
     protected ViewGroup contentView;
 
     /**
      * refresh enable
      */
     protected boolean isPullRefreshEnable = true;
+
     /**
      * load more enable
      */
     protected boolean isPullLoadEnable = true;
 
     protected int backgroundColor = Color.parseColor("#F0EFEF");
+
     protected int contentViewColor = Color.WHITE;
 
     protected BaseRefreshView refreshView;
+
     protected BaseLoaderView loaderView;
+
     protected ViewGroup standView;
 
     private boolean overScroll = true;
@@ -132,6 +127,7 @@ public abstract class BaseLayout extends LinearLayout
     private NestedScrollingParentHelper mNestedScrollingParentHelper;
 
     protected int totalPages = -1;
+
     protected int currentPages = 1;
 
     /**
@@ -140,38 +136,35 @@ public abstract class BaseLayout extends LinearLayout
     protected boolean LoadDataScrollEnable = true;
 
     /**
-     * BaseLayout state (this state indicates the state of the ContentView is off the screen).
+     * BaseLayout state (this state indicates the state of the ContentView is
+     * off the screen).
      */
     public enum CONTENT_VIEW_STATE {
 
-        //normal state
+        // normal state
         NORMAL,
 
-        //Corresponding to the up pull process
+        // Corresponding to the up pull process
         PUSH,
 
-        //Corresponding to the drop-down process
+        // Corresponding to the drop-down process
         PULL
     }
 
     protected CONTENT_VIEW_STATE state = CONTENT_VIEW_STATE.NORMAL;
 
     /**
-     * ContentView Rolling direction, provided by ContentView
-     * The contentView must provide.
+     * ContentView Rolling direction, provided by ContentView The contentView
+     * must provide.
      */
     public enum CONTENT_VIEW_SCROLL_ORIENTATION {
-        UP,
-        DOWN,
-        IDLE
+        UP, DOWN, IDLE
     }
 
-    protected CONTENT_VIEW_SCROLL_ORIENTATION orientation =
-            CONTENT_VIEW_SCROLL_ORIENTATION.IDLE;
+    protected CONTENT_VIEW_SCROLL_ORIENTATION orientation = CONTENT_VIEW_SCROLL_ORIENTATION.IDLE;
 
-    protected LinearLayout.LayoutParams layoutParams =
-            new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT,
-                    LayoutParams.WRAP_CONTENT);
+    protected LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT,
+            LayoutParams.WRAP_CONTENT);
 
     public BaseLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -207,43 +200,45 @@ public abstract class BaseLayout extends LinearLayout
         overScroll = array.getBoolean(R.styleable.NRecyclerView_over_scroll, true);
         innerView = array.getString(R.styleable.NRecyclerView_inner_view);
         LoadDataScrollEnable = array.getBoolean(R.styleable.NRecyclerView_loaddata_scrolleable, false);
-        int interpolatorId = array.getResourceId(R.styleable.NRecyclerView_interpolator, android.R.anim.accelerate_decelerate_interpolator);
+        int interpolatorId = array.getResourceId(R.styleable.NRecyclerView_interpolator,
+                android.R.anim.accelerate_decelerate_interpolator);
 
         Interpolator interpolator = null;
 
         switch (interpolatorId) {
-            case android.R.anim.accelerate_decelerate_interpolator:
-                interpolator = new AccelerateDecelerateInterpolator();
-                break;
-            case android.R.anim.accelerate_interpolator:
-                interpolator = new AccelerateInterpolator();
-                break;
-            case android.R.anim.anticipate_interpolator:
-                interpolator = new AnticipateInterpolator();
-                break;
-            case android.R.anim.anticipate_overshoot_interpolator:
-                interpolator = new AnticipateOvershootInterpolator();
-                break;
-            case android.R.anim.bounce_interpolator:
-                interpolator = new BounceInterpolator();
-                break;
-            case android.R.anim.decelerate_interpolator:
-                interpolator = new DecelerateInterpolator();
-                break;
-            case android.R.anim.linear_interpolator:
-                interpolator = new LinearInterpolator();
-                break;
-            case android.R.anim.overshoot_interpolator:
-                interpolator = new OvershootInterpolator();
-                break;
-            default:
-                interpolator = new AccelerateDecelerateInterpolator();
-                break;
+        case android.R.anim.accelerate_decelerate_interpolator:
+            interpolator = new AccelerateDecelerateInterpolator();
+            break;
+        case android.R.anim.accelerate_interpolator:
+            interpolator = new AccelerateInterpolator();
+            break;
+        case android.R.anim.anticipate_interpolator:
+            interpolator = new AnticipateInterpolator();
+            break;
+        case android.R.anim.anticipate_overshoot_interpolator:
+            interpolator = new AnticipateOvershootInterpolator();
+            break;
+        case android.R.anim.bounce_interpolator:
+            interpolator = new BounceInterpolator();
+            break;
+        case android.R.anim.decelerate_interpolator:
+            interpolator = new DecelerateInterpolator();
+            break;
+        case android.R.anim.linear_interpolator:
+            interpolator = new LinearInterpolator();
+            break;
+        case android.R.anim.overshoot_interpolator:
+            interpolator = new OvershootInterpolator();
+            break;
+        default:
+            interpolator = new AccelerateDecelerateInterpolator();
+            break;
         }
 
         mScroller = new Scroller(context, interpolator);
 
-        if (TextUtils.isEmpty(innerView)) innerView = "NONE";
+        if (TextUtils.isEmpty(innerView))
+            innerView = "NONE";
         FirstLoadState = isPullLoadEnable;
         contentView = CreateEntryView(context, attrs, innerView);
         headerView = CreateRefreshView(context);
@@ -262,10 +257,9 @@ public abstract class BaseLayout extends LinearLayout
         array.recycle();
     }
 
-
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        //TODO Auto-generated method stub
+        // TODO Auto-generated method stub
         final int action = ev.getAction();
 
         if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) {
@@ -282,39 +276,40 @@ public abstract class BaseLayout extends LinearLayout
 
         switch (action) {
 
-            case MotionEvent.ACTION_DOWN: {
-                mLastMotionY = mInitialMotionY = ev.getY();
-                mIsBeingDragged = false;
-                break;
-            }
+        case MotionEvent.ACTION_DOWN: {
+            mLastMotionY = mInitialMotionY = ev.getY();
+            mIsBeingDragged = false;
+            break;
+        }
 
-            case MotionEvent.ACTION_MOVE: {
+        case MotionEvent.ACTION_MOVE: {
 
-                if (!LoadDataScrollEnable)
-                    if (isRefreshing || isLoadingMore)
-                        return true;
+            if (!LoadDataScrollEnable)
+                if (isRefreshing || isLoadingMore)
+                    return true;
 
-                if (!overScroll)
-                    return super.onInterceptTouchEvent(ev);
+            if (!overScroll)
+                return super.onInterceptTouchEvent(ev);
 
-                final float y = ev.getY(), x = ev.getX();
-                final float diff, absDiff;
-                diff = y - mLastMotionY;
-                absDiff = Math.abs(diff);
+            final float y = ev.getY(), x = ev.getX();
+            final float diff, absDiff;
+            diff = y - mLastMotionY;
+            absDiff = Math.abs(diff);
 
-                if (standView == null) {
+            if (standView == null) {
 
-                    Logger.getLogger().e("absDiff = " + absDiff + "/ mTouchSlop = " + mTouchSlop + "/ diff = " + diff);
-                    if (absDiff > mTouchSlop && diff > 1) {
-                        if (getLocalRectPosition(contentView.getChildAt(0)).top == 0 && IsFirstItem) {
-                            mIsBeingDragged = true;
-                            mLastMotionY = y;
-                            state = CONTENT_VIEW_STATE.PULL;
-                        }
+                Logger.getLogger().e("absDiff = " + absDiff + "/ mTouchSlop = " + mTouchSlop + "/ diff = " + diff);
+                if (absDiff > mTouchSlop && diff > 1) {
+                    if (getLocalRectPosition(contentView.getChildAt(0)).top == 0 && IsFirstItem) {
+                        mIsBeingDragged = true;
+                        mLastMotionY = y;
+                        state = CONTENT_VIEW_STATE.PULL;
                     }
+                }
 
-                    if (absDiff > mTouchSlop && diff < 0) {
-                        View lastView = contentView.getChildAt(contentView.getChildCount() - 1);
+                if (absDiff > mTouchSlop && diff < 0) {
+                    View lastView = contentView.getChildAt(contentView.getChildCount() - 1);
+                    if (lastView != null) {
                         int bottom = getLocalRectPosition(lastView).bottom;
                         int height = lastView.getHeight();
                         isFillContent();
@@ -329,18 +324,19 @@ public abstract class BaseLayout extends LinearLayout
                             state = CONTENT_VIEW_STATE.PUSH;
                         }
                     }
-                } else {
-                    if (absDiff > mTouchSlop && diff > 1) {
-                        mIsBeingDragged = true;
-                        state = CONTENT_VIEW_STATE.PULL;
-                    }
-                    if (absDiff > mTouchSlop && diff < 0) {
-                        mIsBeingDragged = true;
-                        state = CONTENT_VIEW_STATE.PUSH;
-                    }
                 }
-                break;
+            } else {
+                if (absDiff > mTouchSlop && diff > 1) {
+                    mIsBeingDragged = true;
+                    state = CONTENT_VIEW_STATE.PULL;
+                }
+                if (absDiff > mTouchSlop && diff < 0) {
+                    mIsBeingDragged = true;
+                    state = CONTENT_VIEW_STATE.PUSH;
+                }
             }
+            break;
+        }
         }
 
         Logger.getLogger().w("Whether to intercept----->" + mIsBeingDragged);
@@ -359,21 +355,20 @@ public abstract class BaseLayout extends LinearLayout
     }
 
     /**
-     * if you start, the content of contentView is not filled,
-     * then we set it to false. for pullLoad
+     * if you start, the content of contentView is not filled, then we set it to
+     * false. for pullLoad
      */
     private void isFillContent() {
-        //The first Child is likely to be an ad bit
+        // The first Child is likely to be an ad bit
         int count = contentView.getChildCount() - 1;
-        int totalHeight = contentView.getChildAt(contentView.getChildCount() - 1)
-                .getHeight() * count + contentView.getChildAt(0).getHeight();
+        int totalHeight = contentView.getChildAt(contentView.getChildCount() - 1).getHeight() * count
+                + contentView.getChildAt(0).getHeight();
         int contentHeight = contentView.getHeight();
 
-        //Add to item decor height
+        // Add to item decor height
         totalHeight += ITEM_DIVIDE_SIZE * count;
 
-        if (totalHeight <
-                contentHeight)
+        if (totalHeight < contentHeight)
             isPullLoadEnable = false;
     }
 
@@ -408,101 +403,104 @@ public abstract class BaseLayout extends LinearLayout
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
-        if (event.getAction() == MotionEvent.ACTION_DOWN
-                && event.getEdgeFlags() != 0)
+        if (event.getAction() == MotionEvent.ACTION_DOWN && event.getEdgeFlags() != 0)
             return false;
-        if (!mScroller.isFinished()) return false;
+        if (!mScroller.isFinished())
+            return false;
         switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN: {
-                mLastMotionY = mInitialMotionY = event.getY();
+        case MotionEvent.ACTION_DOWN: {
+            mLastMotionY = mInitialMotionY = event.getY();
+            return true;
+        }
+        case MotionEvent.ACTION_MOVE: {
+            if (mIsBeingDragged) {
+                mLastMotionY = event.getY();
+                float moveY = mLastMotionY - mInitialMotionY;
+                pullEvent(moveY);
                 return true;
             }
-            case MotionEvent.ACTION_MOVE: {
-                if (mIsBeingDragged) {
-                    mLastMotionY = event.getY();
-                    float moveY = mLastMotionY - mInitialMotionY;
-                    pullEvent(moveY);
-                    return true;
-                }
-                break;
-            }
-            case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
-                float upY = event.getY() - mInitialMotionY;
-                if (mIsBeingDragged) {
-                    if (state == CONTENT_VIEW_STATE.PULL) {
-                        if (isPullRefreshEnable) {
+            break;
+        }
+        case MotionEvent.ACTION_CANCEL:
+        case MotionEvent.ACTION_UP: {
+            float upY = event.getY() - mInitialMotionY;
+            if (mIsBeingDragged) {
+                if (state == CONTENT_VIEW_STATE.PULL) {
+                    if (isPullRefreshEnable) {
 
-                            if (refreshView != null) {
-                                if ((int) (upY * resistance) < refreshView.getHeight()) {
-                                    //go back
-                                    startMoveAnim(getScrollY(), Math.abs(getScrollY()), duration);
+                        if (refreshView != null) {
+                            if ((int) (upY * resistance) < refreshView.getHeight()) {
+                                // go back
+                                startMoveAnim(getScrollY(), Math.abs(getScrollY()), duration);
+                            } else {
+                                if (!isRefreshing) {
+                                    if (isPullRefreshEnable) {
+                                        // refresh
+                                        startMoveAnim(getScrollY(), Math.abs(getScrollY()) - refreshView.getHeight(),
+                                                duration);
+                                        refreshView.setState(HeaderStateInterface.REFRESHING);
+                                        isRefreshing = true;
+                                        if (l != null) {
+                                            setPullLoadEnable(FirstLoadState);
+                                            velocityY = 0;
+                                            l.refresh();
+                                            setPullLoadEnable(false);
+                                            if (loaderView != null)
+                                                loaderView.setVisibility(VISIBLE);
+                                        }
+                                    }
                                 } else {
-                                    if (!isRefreshing) {
-                                        if (isPullRefreshEnable) {
-                                            //refresh
-                                            startMoveAnim(getScrollY(), Math.abs(getScrollY()) -
-                                                    refreshView.getHeight(), duration);
-                                            refreshView.setState(HeaderStateInterface.REFRESHING);
-                                            isRefreshing = true;
-                                            if (l != null) {
-                                                setPullLoadEnable(FirstLoadState);
-                                                velocityY = 0;
-                                                l.refresh();
+                                    startMoveAnim(getScrollY(), Math.abs(getScrollY()) - refreshView.getHeight(),
+                                            duration);
+                                }
+                            }
+                        }
+                    } else {
+                        if (overScroll)
+                            startMoveAnim(getScrollY(), Math.abs(getScrollY()), duration);
+                    }
+                    mIsBeingDragged = false;
+                } else if (state == CONTENT_VIEW_STATE.PUSH) {
+                    if (standView == null) {
+                        if (isPullLoadEnable && !isRefreshing) {
+                            // TODO LOAD MORE...
+                            if (loaderView != null) {
+                                int absUpy = (int) Math.abs(upY);
+                                if ((absUpy * resistance) < loaderView.getHeight()) {
+                                    startMoveAnim(getScrollY(), -getScrollY(), duration);
+                                } else {
+                                    if (!isLoadingMore) {
+                                        if (isPullLoadEnable) {
+                                            startMoveAnim(getScrollY(),
+                                                    -(Math.abs(getScrollY()) - loaderView.getHeight()), duration);
+                                            loaderView.setState(LoaderStateInterface.LOADING_MORE);
+                                            isLoadingMore = true;
+                                            currentPages++;
+                                            if (currentPages == totalPages)
                                                 setPullLoadEnable(false);
-                                                if (loaderView != null)
-                                                    loaderView.setVisibility(VISIBLE);
-                                            }
+                                            if (l != null)
+                                                l.load();
                                         }
                                     } else {
-                                        startMoveAnim(getScrollY(), Math.abs(getScrollY()) -
-                                                refreshView.getHeight(), duration);
+                                        // startMoveAnim(getScrollY(),-
+                                        // (Math.abs(getScrollY()) -
+                                        // loaderView.getHeight()),duration);
                                     }
                                 }
                             }
                         } else {
                             if (overScroll)
-                                startMoveAnim(getScrollY(), Math.abs(getScrollY()), duration);
+                                startMoveAnim(getScrollY(), -getScrollY(), duration);
                         }
-                        mIsBeingDragged = false;
-                    } else if (state == CONTENT_VIEW_STATE.PUSH) {
-                        if (standView == null) {
-                            if (isPullLoadEnable && !isRefreshing) {
-                                //TODO LOAD MORE...
-                                if (loaderView != null) {
-                                    int absUpy = (int) Math.abs(upY);
-                                    if ((absUpy * resistance) < loaderView.getHeight()) {
-                                        startMoveAnim(getScrollY(), -getScrollY(), duration);
-                                    } else {
-                                        if (!isLoadingMore) {
-                                            if (isPullLoadEnable) {
-                                                startMoveAnim(getScrollY(), -(Math.abs(getScrollY()) - loaderView.getHeight()), duration);
-                                                loaderView.setState(LoaderStateInterface.LOADING_MORE);
-                                                isLoadingMore = true;
-                                                currentPages++;
-                                                if (currentPages == totalPages)
-                                                    setPullLoadEnable(false);
-                                                if (l != null)
-                                                    l.load();
-                                            }
-                                        } else {
-//                                            startMoveAnim(getScrollY(),- (Math.abs(getScrollY()) - loaderView.getHeight()),duration);
-                                        }
-                                    }
-                                }
-                            } else {
-                                if (overScroll)
-                                    startMoveAnim(getScrollY(), -getScrollY(), duration);
-                            }
-                        } else {
-                            startMoveAnim(getScrollY(), -getScrollY(), duration);
-                        }
-                        mIsBeingDragged = false;
+                    } else {
+                        startMoveAnim(getScrollY(), -getScrollY(), duration);
                     }
-                    return true;
+                    mIsBeingDragged = false;
                 }
-                break;
+                return true;
             }
+            break;
+        }
         }
         return super.onTouchEvent(event);
     }
@@ -521,7 +519,8 @@ public abstract class BaseLayout extends LinearLayout
             }
             setPullLoadEnable(true);
             currentPages = 1;
-            if (refreshView != null) refreshView.setState(HeaderStateInterface.IDLE);
+            if (refreshView != null)
+                refreshView.setState(HeaderStateInterface.IDLE);
 
             velocityY = -1;
             scrollToFirstItemPosition();
@@ -542,8 +541,9 @@ public abstract class BaseLayout extends LinearLayout
                     loaderView.setState(LoaderStateInterface.LOADING_MORE);
 
                     /**
-                     * capture the contentView sliding speed, when the slide to the end of the time
-                     * display is loaded according to the speed, so it appears to be more smooth
+                     * capture the contentView sliding speed, when the slide to
+                     * the end of the time display is loaded according to the
+                     * speed, so it appears to be more smooth
                      */
                     BigDecimal height = new BigDecimal(loaderView.getHeight());
                     BigDecimal velocity = new BigDecimal(velocityY);
@@ -558,9 +558,10 @@ public abstract class BaseLayout extends LinearLayout
                     isLoadingMore = true;
                     IsLastItem = true;
                     currentPages++;
-//                    if(currentPages  == totalPages)
-//                        setPullLoadEnable(false);
-                    if (l != null) l.load();
+                    // if(currentPages == totalPages)
+                    // setPullLoadEnable(false);
+                    if (l != null)
+                        l.load();
                 }
             }
         } catch (Exception e) {
@@ -583,12 +584,11 @@ public abstract class BaseLayout extends LinearLayout
     }
 
     /**
-     * copy PullToRefresh
-     * but the way to achieve it and it is different, this way is more convenient
+     * copy PullToRefresh but the way to achieve it and it is different, this
+     * way is more convenient
      */
     public void pullOverScroll() {
         try {
-
 
             if (!mIsBeingDragged && !isRefreshing && isPullRefreshEnable && velocityY > 0) {
 
@@ -619,7 +619,8 @@ public abstract class BaseLayout extends LinearLayout
                 int theaValue = rect.bottom - rect.top;
                 Logger.getLogger().e("getScrollY = " + getScrollY());
                 if (getScrollY() > 0) {
-                    //The contentView under the View roll up, it looks no sense of violation
+                    // The contentView under the View roll up, it looks no sense
+                    // of violation
                     contentView.scrollBy(0, theaValue);
                 }
 
@@ -628,8 +629,10 @@ public abstract class BaseLayout extends LinearLayout
 
                 scrollTo(0, 0);
                 /**
-                 * set the state LoaderView is intended to be
-                 * no longer let BaseLayout handle nestScroll, otherwise it will consume the event at the bottom of the PUSH
+                 * set the state LoaderView is intended to be no longer let
+                 * BaseLayout handle nestScroll, otherwise it will consume the
+                 * event at the bottom of the PUSH
+                 * 
                  * @see nested sliding condition
                  */
                 if (currentPages == totalPages) {
@@ -669,7 +672,8 @@ public abstract class BaseLayout extends LinearLayout
                                 refreshView.setState(HeaderStateInterface.IDLE);
                         }
                     } else {
-                        //When LoadDataScrollEnable is true, and then pull down the ContentView when  come here
+                        // When LoadDataScrollEnable is true, and then pull down
+                        // the ContentView when come here
                         scrollTo(0, -(int) (refreshView.getHeight() + value * resistance));
                     }
                 } else {
@@ -753,37 +757,41 @@ public abstract class BaseLayout extends LinearLayout
             footerView.layout(0, getHeight(), getWidth(), getHeight() + loaderView.getHeight());
     }
 
-    //TODO =========================================== NestedScrollingParent ==================================================
+    // TODO =========================================== NestedScrollingParent
+    // ==================================================
 
     private boolean isNest = true;
 
     @Override
     public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
         /**
-         * the function of setting the isNest is if the load is over, there is no need to slide in the nested
-         * because every time this method will intercept events, although the interception did not deal with any thing,
-         * return to the BaseLayout or there will be a small carton,
+         * the function of setting the isNest is if the load is over, there is
+         * no need to slide in the nested because every time this method will
+         * intercept events, although the interception did not deal with any
+         * thing, return to the BaseLayout or there will be a small carton,
          */
         if (loaderView != null)
-            isNest = (loaderView.getState() ==
-                    LoaderStateInterface.NO_MORE) ? false : true;
+            isNest = (loaderView.getState() == LoaderStateInterface.NO_MORE) ? false : true;
 
         /**
-         * 1, vertical scrolling is nested.
-         * 2、Nested conditional.
-         * 3、In order to prevent the user loaderView height PUSH shows.
-         * that there is no half will shrink back, then PUSH will cause the event will be consumed.
+         * 1, vertical scrolling is nested. 2、Nested conditional. 3、In order to
+         * prevent the user loaderView height PUSH shows. that there is no half
+         * will shrink back, then PUSH will cause the event will be consumed.
          * 4、Don't nest scroll when overScroll is true.
          *
-         * three conditions of a small bug when the user PUSH LoaderView half, retracted. Then pull a distance, and then PUSH at this time
-         * true. for NRecyclerView in the onScrollListener isNestConfilct inside to change this state
+         * three conditions of a small bug when the user PUSH LoaderView half,
+         * retracted. Then pull a distance, and then PUSH at this time true. for
+         * NRecyclerView in the onScrollListener isNestConfilct inside to change
+         * this state
+         * 
          * @See {@link NRecyclerView}
          */
-        boolean isAllowNest = (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0 &&
-                ((isNest || isRefreshing) || orientation == CONTENT_VIEW_SCROLL_ORIENTATION.UP)
-                && !isNestConfilct && !(!isPullRefreshEnable && !isPullLoadEnable);
+        boolean isAllowNest = (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0
+                && ((isNest || isRefreshing) || orientation == CONTENT_VIEW_SCROLL_ORIENTATION.UP) && !isNestConfilct
+                && !(!isPullRefreshEnable && !isPullLoadEnable);
 
-        Logger.getLogger().d("isNest = " + isNest + "/ orientation = " + orientation + "/ isNestConfilct = " + isNestConfilct);
+        Logger.getLogger()
+                .d("isNest = " + isNest + "/ orientation = " + orientation + "/ isNestConfilct = " + isNestConfilct);
         Logger.getLogger().w("Whether to allow nested sliding--->" + (isAllowNest ? "yes" : "no"));
 
         return isAllowNest;
@@ -808,8 +816,9 @@ public abstract class BaseLayout extends LinearLayout
         nestMoveY = 0;
         if (isHandleRefreshingScroll) {
             /**
-             * when the load is being loaded, push up the process, if the RefreshView is still in the
-             * the top of the screen, then you don't have to.
+             * when the load is being loaded, push up the process, if the
+             * RefreshView is still in the the top of the screen, then you don't
+             * have to.
              */
             if (getLocalRectPosition(refreshView).bottom <= 0) {
                 scrollTo(0, 0);
@@ -821,7 +830,8 @@ public abstract class BaseLayout extends LinearLayout
             if (Math.abs(getScrollY()) > refreshView.getHeight()) {
                 startMoveAnim(getScrollY(), Math.abs(getScrollY() + refreshView.getHeight()), duration);
             } else {
-                //If you drag the height of RefreshView is not high, it will not deal with
+                // If you drag the height of RefreshView is not high, it will
+                // not deal with
             }
             isHandleRefreshingWhilePull = false;
         }
@@ -830,20 +840,19 @@ public abstract class BaseLayout extends LinearLayout
             if (getScrollY() > loaderView.getHeight()) {
                 startMoveAnim(getScrollY(), -(getScrollY() - loaderView.getHeight()), duration);
             } else {
-                //nothing to do.
+                // nothing to do.
             }
             isHandleLoadingWhilePush = false;
         }
         isFlingConfilcHandle = false;
     }
 
-
     protected boolean isNestConfilct = false;
 
     private void handlePushNestStop() {
         if (standView == null) {
             if (isPullLoadEnable) {
-                //load more.
+                // load more.
                 if (loaderView != null) {
                     int absUpy = Math.abs(nestMoveY);
                     if ((absUpy * resistance) < loaderView.getHeight()) {
@@ -857,7 +866,8 @@ public abstract class BaseLayout extends LinearLayout
                             currentPages++;
                             if (currentPages == totalPages)
                                 setPullLoadEnable(false);
-                            if (l != null) l.load();
+                            if (l != null)
+                                l.load();
                         }
                     }
                 }
@@ -869,7 +879,8 @@ public abstract class BaseLayout extends LinearLayout
             startMoveAnim(getScrollY(), -getScrollY(), duration);
         }
 
-        //Set the status to NORMAL, because the onNestStop method will call a number of times
+        // Set the status to NORMAL, because the onNestStop method will call a
+        // number of times
         state = CONTENT_VIEW_STATE.NORMAL;
         isNestLoad = false;
     }
@@ -879,12 +890,12 @@ public abstract class BaseLayout extends LinearLayout
     }
 
     private int nestMoveY = 0;
+
     protected boolean isNestLoad = false;
 
-
     /**
-     * handling when loading, the user quickly slides
-     * cause HeaderView or LoaderView not to move up
+     * handling when loading, the user quickly slides cause HeaderView or
+     * LoaderView not to move up
      */
     private boolean isFlingConfilcHandle = false;
 
@@ -892,6 +903,9 @@ public abstract class BaseLayout extends LinearLayout
     public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
 
         View lastView = contentView.getChildAt(contentView.getChildCount() - 1);
+        if (lastView == null) {
+            return;
+        }
         Rect rect = getLocalRectPosition(lastView);
         if (rect.bottom == lastView.getHeight() && IsLastItem && !isRefreshing && !isLoadingMore) {
 
@@ -902,8 +916,9 @@ public abstract class BaseLayout extends LinearLayout
             isNestLoad = true;
 
             /**
-             * when we PUSH process, the bottom of the FootView appears, and then down PULL,
-             * then the content of contentView will also be rolling along with it, so we have to spend the event here.
+             * when we PUSH process, the bottom of the FootView appears, and
+             * then down PULL, then the content of contentView will also be
+             * rolling along with it, so we have to spend the event here.
              */
             if (nestMoveY > 0) {
                 consumed[0] = dx;
@@ -927,8 +942,7 @@ public abstract class BaseLayout extends LinearLayout
             isHandleRefreshingScroll = true;
         }
 
-        if (isRefreshing && dy < 0 &&
-                getLocalRectPosition(contentView.getChildAt(0)).top == 0 && IsFirstItem) {
+        if (isRefreshing && dy < 0 && getLocalRectPosition(contentView.getChildAt(0)).top == 0 && IsFirstItem) {
             if (Math.abs(getScrollY()) < refreshView.getHeight()) {
                 scrollTo(0, getScrollY() + dy);
                 isFlingConfilcHandle = true;
@@ -963,7 +977,9 @@ public abstract class BaseLayout extends LinearLayout
     }
 
     private boolean isHandleRefreshingScroll = false;
+
     private boolean isHandleRefreshingWhilePull = false;
+
     private boolean isHandleLoadingWhilePush = false;
 
     @Override
@@ -981,9 +997,9 @@ public abstract class BaseLayout extends LinearLayout
         this.velocityY = Math.abs(velocityY);
 
         /**
-         * If the user has been dragging with hands,
-         * and then quickly put down from the middle position,
-         * will lead to the phenomenon can not be loaded and onNestStop
+         * If the user has been dragging with hands, and then quickly put down
+         * from the middle position, will lead to the phenomenon can not be
+         * loaded and onNestStop
          */
         isNestLoad = false;
         if (isFlingConfilcHandle) {
